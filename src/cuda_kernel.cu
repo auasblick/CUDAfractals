@@ -41,7 +41,7 @@ void cuda_sum(double* A, double* B, double* C, int arraySize) {
     dim3 gridSize(512 / arraySize + 1, 1);
 
     // Launch CUDA kernel.
-    vectorAdditionKernel << <gridSize, blockSize >> > (d_A, d_B, d_C, arraySize);
+    vectorAdditionKernel <<<gridSize, blockSize >>> (d_A, d_B, d_C, arraySize);
 
     // Copy result array c back to host memory.
     cudaMemcpy(C, d_C, arraySize * sizeof(double), cudaMemcpyDeviceToHost);
@@ -67,9 +67,13 @@ void cuda_vecsum(std::vector<double>* A, std::vector<double>* B, std::vector<dou
     dim3 gridSize(512 / A->size() + 1, 1);
 
     // Launch CUDA kernel.
-    vectorAdditionKernel << <gridSize, blockSize >> > (d_A, d_B, d_C, A->size());
+    vectorAdditionKernel <<<gridSize, blockSize >>> (d_A, d_B, d_C, A->size());
+
+    //temporary value
+    //double* C_temp = C->data();
 
     // Copy result array c back to host memory.
     cudaMemcpy(C, d_C, A->size() * sizeof(double), cudaMemcpyDeviceToHost);
+    //C->assign(C_temp, C_temp + C->size());
 
 }

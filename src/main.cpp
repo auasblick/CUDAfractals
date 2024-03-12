@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <random>
 #include "cuda_kernel.cuh"
@@ -19,17 +20,24 @@ void populate_vector(std::vector<double>* vec_in, double bottom_thresh = 0, doub
 
     auto gen = [&dist, &generator]() {
             return dist(generator);
-        };
+    };
 
     std::generate(begin(*vec_in), end(*vec_in), gen);
 }
 
 template<typename T>
 void print_vector(std::vector<T>* vec) {
-    for (int i = 0; i < vec->size(); i++) {
-        std::cout << vec->at(i) << " ";
-    }
+    std::cout << std::fixed;
+    std::cout << std::setprecision(2);
+    try {
+        for (int i = 0; i < vec->size(); i++) {
+            std::cout << vec->at(i) << " ";
+        }
     std::cout << std::endl;
+    }
+    catch (std::exception e) {
+        std::cout << "Printing failed\n";
+    }
     return;
 }
 
@@ -46,10 +54,40 @@ std::vector<T> add_vector(std::vector<T>* vec_one, std::vector<T>* vec_two) {
     return vec_out;
 }
 
+template<typename T>
+bool compare_vectors(std::vector<T>* vec_one, std::vector<T>* vec_two, T tolerance = 0) {
+    if (vec_one->size() != vec_two->size()) {
+        return false;
+    }
+    try{
+        for (int i = 0; i < vec_one->size(); i++) {
+            if (std::abs((*vec_one)[i] - (*vec_two)[i]) <= tolerance) {
+                return false;
+            }
+        }
+
+    }
+    catch (std::exception e) {
+        try {
+            (*vec_one)[vec_one->size()];
+        }
+        catch (std::exception e) {
+            std::cout << "Read access violation for first comparison vector\n";
+        }
+        try {
+            (*vec_two)[vec_one->size()];
+        }
+        catch (std::exception e) {
+            std::cout << "Read access violation for second comparison vector\n";
+        }
+    }
+    return true;
+}
+
 int main()
 {
     //define array size
-    int arrs = 50;
+    int arrs = 5;
     double val_range[] = {0, 1000};
     
     // Initialize arrays A, B, and C.
@@ -58,8 +96,16 @@ int main()
     std::vector<double> vec_b(arrs);
 
     // Populate arrays A and B.
-    A[0] = 5; A[1] = 8; A[2] = 3;
-    B[0] = 7; B[1] = 6; B[2] = 4;
+    A[0] = 5.3; A[1] = 8; A[2] = 3.9;
+    B[0] = 7; B[1] = 6.1; B[2] = 4.2;
+    cuda_sum(A, B, C, 3);
+    for (int i = 0; i < 3; i++) {
+        if (i == 0) {
+            std::cout << "A\tB\tC\n";
+        }
+        std::cout << A[i] << "\t" << B[i] << "\t" << C[i] << "\n";
+    }
+    std::cout << "\n\n\n";
     populate_vector(&vec_a, val_range[0], val_range[1]);
     populate_vector(&vec_b, val_range[0], val_range[1]);
 
@@ -70,17 +116,25 @@ int main()
     print_vector(&vec_b);
 
 
-    // Sum array elements across ( C[0] = A[0] + B[0] ) into array C using CUDA.
-    cuda_sum(A, B, C, 3);
+    // Sum array elements across ( C[i] = A[i] + B[i] ) into array C using CUDA.
     std::vector<double> vec_c = add_vector(&vec_a, &vec_b);
     std::vector<double> vec_c_cuda(vec_a.size());
+    cuda_vecsum(&vec_a, &vec_b, &vec_c_cuda);
 
     // Print out result.
-    std::cout << "C = " << C[0] << ", " << C[1] << ", " << C[2] << std::endl;
-    std::cout << "C: ";
-    print_vector(&vec_c);
-    std::cin.get();
+    if (compare_vectors(&vec_c, &vec_c_cuda)) {
+        std::cout << "\nSuccuess! c and c_cuda are identical\n";
+    }
+    else {
+        std::cout << "\nFailure\n";
+        std::cout << "C: ";
+        print_vector(&vec_c);
+        std::cout << "C (cuda): ";
+        print_vector(&vec_c_cuda);
+    }
 
+
+    std::cin.get();
     return 0;
 }
 
